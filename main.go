@@ -48,7 +48,13 @@ func getCurrentWorkingDirectory() (string, error) {
 		return "", fmt.Errorf("failed to get all processes: %w", err)
 	}
 
-	procsByPPID := lo.GroupBy(procs, func(p procfs.Proc) int { return must(p.Stat()).PPID })
+	procsByPPID := lo.GroupBy(procs, func(p procfs.Proc) int {
+		ps, err := p.Stat()
+		if err != nil {
+			return -1
+		}
+		return ps.PPID
+	})
 	procsByPID := lo.GroupBy(procs, func(p procfs.Proc) int { return p.PID })
 
 	// search recursively for processes which are children of
