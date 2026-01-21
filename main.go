@@ -23,6 +23,7 @@ var _ = litter.Dump
 // `~/.config/go/telemetry/local`, and in that case we want to just ignore gopls.
 var ignoreExecutableList []string = []string{
 	"gopls",
+	"xclip",
 	"",
 	".",
 }
@@ -31,6 +32,9 @@ func main() {
 	cwd, err := getCurrentWorkingDirectory()
 	if err != nil {
 		log.Fatalf("Error: %v", err)
+	}
+	for k, v := range replacements {
+		cwd = strings.ReplaceAll(cwd, k, v)
 	}
 	fmt.Println(cwd)
 }
@@ -69,7 +73,7 @@ func getCurrentWorkingDirectory() (string, error) {
 func findDeepestChild(procsByPPID, procsByPID map[int]procfs.Procs, pid, depth int) (int, int64) {
 	indent := strings.Repeat("    ", depth)
 	p := procsByPID[pid][0]
-	dbgprint(os.Stderr, "# %s%d %v %s %q %q\n",
+	dbgprint(os.Stderr, "# %s%d isProcAllowed=%v p.Executable=%q p.CmdLine=%q cwd=%q\n",
 		indent,
 		pid,
 		isProcAllowed(p),
@@ -95,6 +99,11 @@ func findDeepestChild(procsByPPID, procsByPID map[int]procfs.Procs, pid, depth i
 
 func isProcAllowed(p procfs.Proc) bool {
 	baseExeName := path.Base(must(p.Executable()))
+	// due to some wild Kernel behavior in proc, if a running executable had it's exe deleted, then
+	// the link for exe in proc will point to a nonexistent path ending in ' (deleted)', see this
+	// stackoverflow:
+	// https://stackoverflow.com/a/58105245
+	baseExeName = strings.ReplaceAll(baseExeName, " (deleted)", "")
 	return !slices.Contains(ignoreExecutableList, baseExeName)
 }
 
